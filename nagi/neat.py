@@ -184,6 +184,16 @@ class Genome(object):
                     innovation_number = input_key * output_size + i
                     if self.connections.get(innovation_number) is None and random.random() < INITIAL_CONNECTION_RATE:
                         self.connections[innovation_number] = ConnectionGene(input_key, output_key, innovation_number)
+    @staticmethod
+    def create_custom_genome(self, input_size: int, output_size: int):
+        innovation_number_counter = count(input_size * output_size + 1)
+        genome_id = 0
+        return self.__init__(genome_id, self._input_size, self._output_size,
+                                             innovation_number_counter, is_initial_genome=False)
+
+    def add_connection(self, origin_node: int, destination_node: int):
+        innovation_number = next(self.innovation_number_counter)
+        self.connections[innovation_number] = ConnectionGene(origin_node, destination_node, innovation_number)
 
     def _mutate_add_connection(self):
         if random.random() < ADD_CONNECTION_MUTATE_RATE:
@@ -198,6 +208,41 @@ class Genome(object):
                 (origin_node, destination_node) = random.choice(possible_choices)
                 innovation_number = next(self.innovation_number_counter)
                 self.connections[innovation_number] = ConnectionGene(origin_node, destination_node, innovation_number)
+
+    def add_node(self, is_inhibitory: bool, learning_rule: LearningRule,
+                 a_plus: float, a_minus: float, b_plus: float, b_minus: float,
+                 bias: bool):
+        if learning_rule.is_symmetric():
+            stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
+                               'std_plus': b_plus, 'std_minus': b_minus}
+        else:
+            stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
+                               'tau_plus': b_plus, 'tau_minus': b_minus}
+        new_node_gene = HiddenNodeGene(len(self.nodes))
+        new_node_gene.is_inhibitory = is_inhibitory
+        new_node_gene.learning_rule = learning_rule
+        new_node_gene.stdp_parameters = stdp_parameters
+        new_node_gene.bias = bias
+
+        self.nodes[new_node_gene.key] = new_node_gene
+        return new_node_gene.key
+
+    def get_output_nodes_keys(self):
+        return [i for i in range(self.input_size, self.input_size + self.output_size)]
+
+    def set_output_node(self, key: int, learning_rule: LearningRule,
+                 a_plus: float, a_minus: float, b_plus: float, b_minus: float,
+                 bias: bool):
+        output_node_gene = self.nodes[key]
+        if learning_rule.is_symmetric():
+            stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
+                               'std_plus': b_plus, 'std_minus': b_minus}
+        else:
+            stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
+                               'tau_plus': b_plus, 'tau_minus': b_minus}
+        output_node_gene.learning_rule = learning_rule
+        output_node_gene.stdp_parameters = stdp_parameters
+        output_node_gene.bias = bias
 
     def _mutate_add_node(self):
         if random.random() < ADD_NODE_MUTATE_RATE:
