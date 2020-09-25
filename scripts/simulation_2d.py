@@ -6,7 +6,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 from definitions import ROOT_PATH
-from nagi.constants import FLIP_POINT_1D, NUM_TIME_STEPS, RED, BLUE, GREEN
+from nagi.constants import FLIP_POINT_2D, NUM_TIME_STEPS, RED, BLUE, GREEN
 from nagi.simulation_2d import TwoDimensionalEnvironment, TwoDimensionalAgent
 from nagi.visualization import visualize_genome
 
@@ -36,8 +36,8 @@ alpha = 0.85
 
 def add_vertical_lines_and_background(height: int):
     flip_points = [flip_point for flip_point in range(len(t_values))
-                   if flip_point >= FLIP_POINT_1D * NUM_TIME_STEPS
-                   and flip_point % (FLIP_POINT_1D * NUM_TIME_STEPS) == 0]
+                   if flip_point >= FLIP_POINT_2D * NUM_TIME_STEPS
+                   and flip_point % (FLIP_POINT_2D * NUM_TIME_STEPS) == 0]
     sample_points = [sample_point for sample_point in range(len(t_values)) if
                      sample_point >= NUM_TIME_STEPS and
                      sample_point % NUM_TIME_STEPS == 0 and
