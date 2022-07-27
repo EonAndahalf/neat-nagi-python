@@ -4,7 +4,7 @@ from typing import List, Dict
 import numpy as np
 
 from nagi.constants import IZ_MEMBRANE_POTENTIAL_THRESHOLD, STDP_PARAMS, STDP_LEARNING_WINDOW, NEURON_WEIGHT_BUDGET, \
-    THRESHOLD_THETA_INCREMENT_RATE, THRESHOLD_THETA_DECAY_RATE, IZ_SPIKE_VOLTAGE
+    THRESHOLD_THETA_INCREMENT_RATE, THRESHOLD_THETA_DECAY_RATE, IZ_SPIKE_VOLTAGE, WEIGHT_INIT_MEAN, WEIGHT_INIT_STD
 from nagi.neat import Genome, NeuralNodeGene, InputNodeGene, OutputNodeGene
 from nagi.stdp import *
 
@@ -35,7 +35,7 @@ class SpikingNeuron(object):
         self.b = b
         self.c = c
         self.d = d
-        self.inputs = {key: np.random.normal(0.5, 0.1) for key in inputs}
+        self.inputs = {key: np.random.normal(WEIGHT_INIT_MEAN, WEIGHT_INIT_STD) for key in inputs}
         self._normalize_weights()
         self.learning_rule = learning_rule
         self.is_inhibitory = is_inhibitory

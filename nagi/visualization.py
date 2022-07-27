@@ -7,9 +7,16 @@ from matplotlib.legend import Legend
 from matplotlib.legend_handler import HandlerBase
 from matplotlib.lines import Line2D
 from matplotlib.text import Text
+import os
 
 from nagi.constants import RED, BLUE, GREEN, PINK, CYAN
-from nagi.neat import Genome, NeuralNodeGene, NodeGene, InputNodeGene, OutputNodeGene, HiddenNodeGene
+from nagi.neat import Genome, NeuralNodeGene, NodeGene, InputNodeGene, \
+    OutputNodeGene, HiddenNodeGene, NeuralNodeGeneDoublePlasticity, \
+    OutputNodeGeneDoublePlasticity, HiddenNodeGeneDoublePlasticity, \
+    GenomeDoublePlasticity
+import time
+
+timestr = time.strftime("%Y%m%d-%H%M%S")
 
 
 class CustomTextHandler(HandlerBase):
@@ -39,18 +46,21 @@ def visualize_genome(genome: Genome, show_learning_rules: bool = True, with_lege
 
     def legend_circle(color: str):
         return Line2D([0], [0], color=color, marker='o', linewidth=0)
-
+    plt.figure(figsize=(8,8))
     g, nodes, edges = genome_to_graph(genome)
     pos = get_node_coordinates(genome)
 
     labels = {
-        key: f"{node.learning_rule.value if isinstance(node, NeuralNodeGene) else key}{'↩' if (key, key) in edges else ''}"
+        #key: f"{node.learning_rule.value if isinstance(node, NeuralNodeGene) else key}{'↩' if (key, key) in edges else ''}"
+        key: f"{node.learning_rule.value if isinstance(node, NeuralNodeGene) else key}{'' if (key, key) in edges else ''}"
         for key, node in genome.nodes.items()} if show_learning_rules \
-        else {node: f"{node}{'↩' if (node, node) in edges else ''}" for node in nodes}
+        else {node: f"{node}{'' if (node, node) in edges else ''}" for node in nodes}
+        #else {node: f"{node}{'↩' if (node, node) in edges else ''}" for node in nodes}
 
     node_color = [get_color(genome.nodes[node]) for node in nodes]
     edgecolors = ['k' if isinstance(genome.nodes[node], OutputNodeGene) else get_color(genome.nodes[node]) for node in nodes]
-    nx.draw_networkx_nodes(g, pos=pos, nodes=nodes, node_color=node_color, edgecolors=edgecolors, node_size=400)
+    #nx.draw_networkx_nodes(g, pos=pos, nodes=nodes, node_color=node_color, edgecolors=edgecolors, node_size=400)
+    nx.draw_networkx_nodes(g, pos=pos, node_color=node_color, edgecolors=edgecolors, node_size=400)
     nx.draw_networkx_labels(g, pos=pos, labels=labels)
     nx.draw_networkx_edges(g, pos=pos, connectionstyle="arc3, rad=0.05")
     # nx.draw_networkx(g, pos=pos, with_labels=True, labels=labels, nodes=nodes, node_color=node_color, node_size=400,
@@ -71,6 +81,66 @@ def visualize_genome(genome: Genome, show_learning_rules: bool = True, with_lege
         plt.figlegend(handles=legend_dict.keys(), labels=legend_dict.values(), loc='upper right')
     plt.box(False)
     plt.show()
+
+def visualize_genome_doubleplast(genome: GenomeDoublePlasticity,
+                                 show_learning_rules: bool = True,
+                                 with_legend: bool = True,
+                                 savefig: bool = False):
+    def get_color(node: NodeGene):
+        if isinstance(node, InputNodeGene):
+            return GREEN
+        elif isinstance(node, (HiddenNodeGeneDoublePlasticity, OutputNodeGeneDoublePlasticity)):
+            if node.is_inhibitory:
+                if node.bias:
+                    return PINK
+                else:
+                    return RED
+            else:
+                if node.bias:
+                    return CYAN
+                else:
+                    return BLUE
+
+    def legend_circle(color: str):
+        return Line2D([0], [0], color=color, marker='o', linewidth=0)
+
+    g, nodes, edges = genome_to_graph(genome)
+    pos = get_node_coordinates(genome)
+
+    labels = {
+        key: f"{node.learning_rule.value+'i'+node.learning_rule_inh.value if isinstance(node, NeuralNodeGene) else key}{'↩' if (key, key) in edges else ''}"
+        for key, node in genome.nodes.items()} if show_learning_rules \
+        else {node: f"{node}{'↩' if (node, node) in edges else ''}" for node in nodes}
+
+    node_color = [get_color(genome.nodes[node]) for node in nodes]
+    edgecolors = ['k' if isinstance(genome.nodes[node], OutputNodeGeneDoublePlasticity) else get_color(genome.nodes[node]) for node in nodes]
+    #nx.draw_networkx_nodes(g, pos=pos, nodes=nodes, node_color=node_color, edgecolors=edgecolors, node_size=400)
+    nx.draw_networkx_nodes(g, pos=pos, node_color=node_color, edgecolors=edgecolors, node_size=400)
+    nx.draw_networkx_labels(g, pos=pos, labels=labels)
+    nx.draw_networkx_edges(g, pos=pos, connectionstyle="arc3, rad=0.05")
+    # nx.draw_networkx(g, pos=pos, with_labels=True, labels=labels, nodes=nodes, node_color=node_color, node_size=400,
+    #                  font_size=10, connectionstyle="arc3, rad=0.05")
+
+    Legend.update_default_handler_map({Text: CustomTextHandler()})
+    legend_dict = {legend_circle(GREEN): 'input node',
+                   Line2D([0], [0], color='w', markeredgecolor='k', marker='o', linewidth=0): 'output node',
+                   legend_circle(BLUE): 'excitatory, without bias',
+                   legend_circle(RED): 'inhibitory, without bias',
+                   legend_circle(CYAN): 'excitatory, with bias',
+                   legend_circle(PINK): 'inhibitory, with bias',
+                   Text(text='AH'): 'asymmetric hebbian',
+                   Text(text='AA'): 'asymmetric anti-hebbian',
+                   Text(text='SH'): 'symmetric hebbian',
+                   Text(text='SA'): 'symmetric anti-hebbian'}
+    if with_legend:
+        plt.figlegend(handles=legend_dict.keys(), labels=legend_dict.values(), loc='upper right')
+    plt.box(False)
+    if savefig:
+        if not os.path.exists('plots'):
+            os.makedirs('plots')
+        plt.savefig('plots/topology_4d_doubleplast_'+timestr+'.png')   # save the figure to file
+    else:
+        plt.show()
 
 
 def genome_to_graph(genome: Genome):

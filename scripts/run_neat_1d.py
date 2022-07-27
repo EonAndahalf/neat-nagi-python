@@ -3,7 +3,7 @@ import pickle
 import time
 from copy import deepcopy
 
-import tqdm
+#import tqdm
 
 from definitions import ROOT_PATH
 from nagi.neat import Population
@@ -53,7 +53,8 @@ if __name__ == '__main__':
         print(f'\nGeneration {i}...')
         env = OneDimensionalEnvironment(high_frequency, low_frequency)
         agents = list([OneDimensionalAgent.create_agent(genome) for genome in population.genomes.values()])
-        results = tqdm.tqdm(pool.imap_unordered(env.simulate, agents), total=(len(agents)))
+        #results = tqdm.tqdm(pool.imap_unordered(env.simulate, agents), total=(len(agents)))
+        results = pool.imap_unordered(env.simulate, agents, 1)
 
         data_dict = {result[0]: result[1:] for result in results}
         fitnesses = {key: value[0] for key, value in data_dict.items()}

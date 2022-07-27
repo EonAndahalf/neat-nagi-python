@@ -88,6 +88,8 @@ class NagiCartPoleEnv(gym.Env):
 
         self.steps_beyond_done = None
 
+        self.steps_no_reward = 0
+
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
@@ -120,6 +122,19 @@ class NagiCartPoleEnv(gym.Env):
 
         self.state = (x, x_dot, theta, theta_dot)
 
+#        done = bool(
+#            x < -self.x_threshold
+#            or x > self.x_threshold
+#            or self.steps_no_reward > 100
+#        )
+#
+#        reward = 1.0
+#        if not done:
+#            if theta < -self.theta_threshold_radians \
+#            or theta > self.theta_threshold_radians:
+#                reward = 0.0
+#                self.steps_no_reward += 1
+
         done = bool(
             x < -self.x_threshold
             or x > self.x_threshold
@@ -149,6 +164,7 @@ class NagiCartPoleEnv(gym.Env):
     def reset(self):
         self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,))
         self.steps_beyond_done = None
+        self.steps_no_reward = 0
         return np.array(self.state)
 
     def render(self, mode='human'):

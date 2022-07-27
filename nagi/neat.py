@@ -16,7 +16,7 @@ from nagi.constants import ENABLE_MUTATE_RATE, ADD_CONNECTION_MUTATE_RATE, ADD_N
     SYMMETRIC_A_MINUS_MUTATE_SCALE, SYMMETRIC_STD_PLUS_MUTATE_SCALE, ASYMMETRIC_A_MUTATE_SCALE, \
     ASYMMETRIC_TAU_MUTATE_SCALE, SPECIES_PROTECTION_LIMIT, SPECIES_STAGNATION_LIMIT, SYMMETRIC_STD_MINUS_INIT_RANGE, \
     SYMMETRIC_STD_MINUS_MUTATE_SCALE, BIAS_INIT_PROBABILITIES, BIAS_MUTATE_RATE, EXCITATORY_INIT_PROBABILITIES, ELITISM, \
-    MIN_NUMBER_OF_SPECIES
+    MIN_NUMBER_OF_SPECIES, MUTATE_ELITE
 
 
 class LearningRule(Enum):
@@ -137,6 +137,96 @@ class OutputNodeGene(NeuralNodeGene):
     def mutate(self):
         super().mutate()
 
+class NeuralNodeGeneDoublePlasticity(NeuralNodeGene):
+    def __init__(self, key: int, is_inhibitory: bool):
+        super().__init__(key, is_inhibitory=is_inhibitory)
+        self.learning_rule_inh = self._initialize_learning_rule_inh()
+        self.stdp_parameters_inh = self._initialize_stdp_parameters_inh()
+
+    def mutate(self):
+        mutate_stdp_parameters = True
+        mutate_stdp_parameters_inh = True
+        if np.random.random() < BIAS_MUTATE_RATE:
+            self.bias = not self.bias
+
+        if np.random.random() < LEARNING_RULE_MUTATE_RATE:
+            previous_learning_rule = self.learning_rule
+            self.learning_rule = random.choice([rule for rule in LearningRule if rule is not self.learning_rule])
+            if previous_learning_rule.is_symmetric() ^ self.learning_rule.is_symmetric():
+                self.stdp_parameters = self._initialize_stdp_parameters()
+                mutate_stdp_parameters = False
+        if mutate_stdp_parameters:
+            r = np.random.random()
+            if r < STDP_PARAMETERS_MUTATE_RATE:
+                self._mutate_stdp_parameters()
+            elif r < STDP_PARAMETERS_MUTATE_RATE + STDP_PARAMETERS_REINIT_RATE:
+                self.stdp_parameters = self._initialize_stdp_parameters()
+
+        if np.random.random() < LEARNING_RULE_MUTATE_RATE:
+            previous_learning_rule_inh = self.learning_rule_inh
+            self.learning_rule_inh = random.choice([rule for rule in LearningRule if rule is not self.learning_rule_inh])
+            if previous_learning_rule_inh.is_symmetric() ^ self.learning_rule_inh.is_symmetric():
+                self.stdp_parameters_inh = self._initialize_stdp_parameters_inh()
+                mutate_stdp_parameters_inh = False
+        if mutate_stdp_parameters_inh:
+            r = np.random.random()
+            if r < STDP_PARAMETERS_MUTATE_RATE:
+                self._mutate_stdp_parameters_inh()
+            elif r < STDP_PARAMETERS_MUTATE_RATE + STDP_PARAMETERS_REINIT_RATE:
+                self.stdp_parameters_inh = self._initialize_stdp_parameters_inh()
+
+    def _initialize_learning_rule_inh(self) -> LearningRule:
+        p = INHIBITORY_PROBABILITIES if not self.is_inhibitory else EXCITATORY_PROBABILITIES
+        return np.random.choice([learning_rule for learning_rule in LearningRule], p=p)
+
+    def _initialize_stdp_parameters_inh(self) -> Dict[str, float]:
+        if self.learning_rule_inh.is_symmetric():
+            return NeuralNodeGene._initialize_symmetric_stdp_parameters()
+        else:
+            return NeuralNodeGene._initialize_asymmetric_stdp_parameters()
+
+    def _mutate_stdp_parameters_inh(self):
+        if self.learning_rule_inh.is_symmetric():
+            self._mutate_symmetric_stdp_parameters_inh()
+        else:
+            self._mutate_asymmetric_stdp_parameters_inh()
+
+    def _mutate_symmetric_stdp_parameters_inh(self):
+        a_plus = np.clip(self.stdp_parameters_inh['a_plus'] + np.random.normal(0, SYMMETRIC_A_PLUS_MUTATE_SCALE),
+                         *SYMMETRIC_A_PLUS_INIT_RANGE)
+        a_minus = np.clip(self.stdp_parameters_inh['a_plus'] + np.random.normal(0, SYMMETRIC_A_MINUS_MUTATE_SCALE),
+                          *SYMMETRIC_A_MINUS_INIT_RANGE)
+        std_plus = np.clip(self.stdp_parameters_inh['std_plus'] + np.random.normal(0, SYMMETRIC_STD_PLUS_MUTATE_SCALE),
+                           *SYMMETRIC_STD_PLUS_INIT_RANGE)
+        std_minus = np.clip(self.stdp_parameters_inh['std_plus'] + np.random.normal(0, SYMMETRIC_STD_MINUS_MUTATE_SCALE),
+                            *SYMMETRIC_STD_MINUS_INIT_RANGE)
+        self.stdp_parameters_inh = {'a_plus': a_plus, 'a_minus': a_minus, 'std_plus': std_plus, 'std_minus': std_minus}
+
+    def _mutate_asymmetric_stdp_parameters_inh(self):
+        a_plus, a_minus = (np.clip(self.stdp_parameters_inh[key] + np.random.normal(0, ASYMMETRIC_A_MUTATE_SCALE),
+                                   *ASYMMETRIC_A_INIT_RANGE) for key in ('a_plus', 'a_minus'))
+        tau_plus, tau_minus = (np.clip(self.stdp_parameters_inh[key] + np.random.normal(0, ASYMMETRIC_TAU_MUTATE_SCALE),
+                                       *ASYMMETRIC_TAU_INIT_RANGE) for key in ('tau_plus', 'tau_minus'))
+        self.stdp_parameters_inh = {'a_plus': a_plus, 'a_minus': a_minus, 'tau_plus': tau_plus, 'tau_minus': tau_minus}
+
+
+class HiddenNodeGeneDoublePlasticity(NeuralNodeGeneDoublePlasticity):
+    def __init__(self, key: int):
+        super().__init__(key, is_inhibitory=np.random.choice((True, False), p=EXCITATORY_INIT_PROBABILITIES))
+
+    def mutate(self):
+        if np.random.random() < INHIBITORY_MUTATE_RATE:
+            self.is_inhibitory = not self.is_inhibitory
+        super().mutate()
+
+class OutputNodeGeneDoublePlasticity(NeuralNodeGeneDoublePlasticity):
+    def __init__(self, key: int):
+        super().__init__(key, is_inhibitory=False)
+
+    def mutate(self):
+        super().mutate()
+
+
 
 class ConnectionGene(object):
     def __init__(self, origin_node: int, destination_node: int, innovation_number: int):
@@ -160,40 +250,30 @@ class Genome(object):
         self.input_size = input_size
         self.output_size = output_size
 
-        input_keys = [i for i in range(input_size)]
-        output_keys = [i for i in range(input_size, input_size + output_size)]
+        self.input_keys = [i for i in range(input_size)]
+        self.output_keys = [i for i in range(input_size, input_size + output_size)]
 
         # Initialize node genes for inputs and outputs.
         # TODO: Should probably change this so that all output nodes are always inherited.
-        for input_key in input_keys:
+        for input_key in self.input_keys:
             self.nodes[input_key] = InputNodeGene(input_key)
-        for output_key in output_keys:
+        for output_key in self.output_keys:
             self.nodes[output_key] = OutputNodeGene(output_key)
 
         # Initialize some connection genes if it is an initial genome.
         if is_initial_genome:
             # Guarantee at least one connection to each output node.
-            for i, output_key in enumerate(output_keys):
-                input_key = random.choice(input_keys)
+            for i, output_key in enumerate(self.output_keys):
+                input_key = random.choice(self.input_keys)
                 innovation_number = input_key * output_size + i
                 self.connections[innovation_number] = ConnectionGene(input_key, output_key, innovation_number)
 
             # Add additional initial connections.
-            for input_key in input_keys:
-                for i, output_key in enumerate(output_keys):
+            for input_key in self.input_keys:
+                for i, output_key in enumerate(self.output_keys):
                     innovation_number = input_key * output_size + i
                     if self.connections.get(innovation_number) is None and random.random() < INITIAL_CONNECTION_RATE:
                         self.connections[innovation_number] = ConnectionGene(input_key, output_key, innovation_number)
-    @staticmethod
-    def create_custom_genome(self, input_size: int, output_size: int):
-        innovation_number_counter = count(input_size * output_size + 1)
-        genome_id = 0
-        return self.__init__(genome_id, self._input_size, self._output_size,
-                                             innovation_number_counter, is_initial_genome=False)
-
-    def add_connection(self, origin_node: int, destination_node: int):
-        innovation_number = next(self.innovation_number_counter)
-        self.connections[innovation_number] = ConnectionGene(origin_node, destination_node, innovation_number)
 
     def _mutate_add_connection(self):
         if random.random() < ADD_CONNECTION_MUTATE_RATE:
@@ -208,41 +288,6 @@ class Genome(object):
                 (origin_node, destination_node) = random.choice(possible_choices)
                 innovation_number = next(self.innovation_number_counter)
                 self.connections[innovation_number] = ConnectionGene(origin_node, destination_node, innovation_number)
-
-    def add_node(self, is_inhibitory: bool, learning_rule: LearningRule,
-                 a_plus: float, a_minus: float, b_plus: float, b_minus: float,
-                 bias: bool):
-        if learning_rule.is_symmetric():
-            stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
-                               'std_plus': b_plus, 'std_minus': b_minus}
-        else:
-            stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
-                               'tau_plus': b_plus, 'tau_minus': b_minus}
-        new_node_gene = HiddenNodeGene(len(self.nodes))
-        new_node_gene.is_inhibitory = is_inhibitory
-        new_node_gene.learning_rule = learning_rule
-        new_node_gene.stdp_parameters = stdp_parameters
-        new_node_gene.bias = bias
-
-        self.nodes[new_node_gene.key] = new_node_gene
-        return new_node_gene.key
-
-    def get_output_nodes_keys(self):
-        return [i for i in range(self.input_size, self.input_size + self.output_size)]
-
-    def set_output_node(self, key: int, learning_rule: LearningRule,
-                 a_plus: float, a_minus: float, b_plus: float, b_minus: float,
-                 bias: bool):
-        output_node_gene = self.nodes[key]
-        if learning_rule.is_symmetric():
-            stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
-                               'std_plus': b_plus, 'std_minus': b_minus}
-        else:
-            stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
-                               'tau_plus': b_plus, 'tau_minus': b_minus}
-        output_node_gene.learning_rule = learning_rule
-        output_node_gene.stdp_parameters = stdp_parameters
-        output_node_gene.bias = bias
 
     def _mutate_add_node(self):
         if random.random() < ADD_NODE_MUTATE_RATE:
@@ -315,6 +360,151 @@ class Genome(object):
 
     def get_enabled_connections(self):
         return [connection for connection in self.connections.values() if connection.enabled]
+
+
+    def get_input_nodes_keys(self):
+        return [i for i in range(self.input_size)]
+
+    def get_output_nodes_keys(self):
+        return [i for i in range(self.input_size, self.input_size + self.output_size)]
+
+    def set_output_node(self, key: int, learning_rule: LearningRule,
+                 bias: bool,
+                 a_plus: float = None, a_minus: float = None,
+                 b_plus: float = None, b_minus: float = None):
+        output_node_gene = self.nodes[key]
+        if a_plus and a_minus and b_plus and b_minus:
+            if learning_rule.is_symmetric():
+                stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
+                                   'std_plus': b_plus, 'std_minus': b_minus}
+            else:
+                stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
+                                   'tau_plus': b_plus, 'tau_minus': b_minus}
+        else:
+            if learning_rule.is_symmetric():
+                stdp_parameters = NeuralNodeGene._initialize_symmetric_stdp_parameters()
+            else:
+                stdp_parameters = NeuralNodeGene._initialize_asymmetric_stdp_parameters()
+        output_node_gene.learning_rule = learning_rule
+        output_node_gene.stdp_parameters = stdp_parameters
+        output_node_gene.bias = bias
+
+    def add_node(self, is_inhibitory: bool, learning_rule: LearningRule,
+                 bias: bool,
+                 a_plus: float = None, a_minus: float = None,
+                 b_plus: float = None, b_minus: float = None):
+
+        new_node_gene = HiddenNodeGene(len(self.nodes))
+        new_node_gene.is_inhibitory = is_inhibitory
+        new_node_gene.learning_rule = learning_rule
+
+        if a_plus and a_minus and b_plus and b_minus:
+            if learning_rule.is_symmetric():
+                stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
+                                   'std_plus': b_plus, 'std_minus': b_minus}
+            else:
+                stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
+                                   'tau_plus': b_plus, 'tau_minus': b_minus}
+        else:
+            if learning_rule.is_symmetric():
+                stdp_parameters = NeuralNodeGene._initialize_symmetric_stdp_parameters()
+            else:
+                stdp_parameters = NeuralNodeGene._initialize_asymmetric_stdp_parameters()
+
+        new_node_gene.stdp_parameters = stdp_parameters
+        new_node_gene.bias = bias
+
+        self.nodes[new_node_gene.key] = new_node_gene
+        return new_node_gene.key
+
+    def add_connection(self, origin_node: int, destination_node: int):
+        innovation_number = next(self.innovation_number_counter)
+        self.connections[innovation_number] = ConnectionGene(origin_node, destination_node, innovation_number)
+
+class GenomeDoublePlasticity(Genome):
+    def __init__(self, key: int, input_size: int, output_size: int, innovation_number_counter: Iterator,
+                 is_initial_genome: bool = False):
+        super().__init__(key, input_size, output_size,
+                         innovation_number_counter, is_initial_genome)
+        for output_key in self.output_keys:
+            self.nodes[output_key] = OutputNodeGeneDoublePlasticity(output_key)
+
+    def _mutate_add_node(self):
+        if random.random() < ADD_NODE_MUTATE_RATE:
+            if not self.connections:
+                return
+
+            connection = random.choice(list(self.connections.values()))
+            connection.enabled = False
+
+            new_node_gene = HiddenNodeGeneDoublePlasticity(len(self.nodes))
+            self.nodes[new_node_gene.key] = new_node_gene
+
+            innovation_number = next(self.innovation_number_counter)
+            connection_to_new_node = ConnectionGene(connection.origin_node, new_node_gene.key, innovation_number)
+            self.connections[innovation_number] = connection_to_new_node
+
+            innovation_number = next(self.innovation_number_counter)
+            connection_from_new_node = ConnectionGene(new_node_gene.key, connection.destination_node, innovation_number)
+            self.connections[innovation_number] = connection_from_new_node
+
+    def set_output_node(self, key: int, learning_rule: LearningRule,
+                 learning_rule_inh: LearningRule, bias: bool,
+                 a_plus: float = None, a_minus: float = None,
+                 b_plus: float = None, b_minus: float = None):
+        output_node_gene = self.nodes[key]
+        output_node_gene.learning_rule = learning_rule
+
+        if a_plus and a_minus and b_plus and b_minus:
+            if learning_rule.is_symmetric():
+                stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
+                                   'std_plus': b_plus, 'std_minus': b_minus}
+            else:
+                stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
+                                   'tau_plus': b_plus, 'tau_minus': b_minus}
+        else:
+            if learning_rule.is_symmetric():
+                stdp_parameters = NeuralNodeGene._initialize_symmetric_stdp_parameters()
+            else:
+                stdp_parameters = NeuralNodeGene._initialize_asymmetric_stdp_parameters()
+
+        output_node_gene.stdp_parameters = stdp_parameters
+        output_node_gene.bias = bias
+
+        output_node_gene.learning_rule_inh = learning_rule_inh
+        output_node_gene.stdp_parameters_inh = stdp_parameters
+
+
+    def add_node(self, is_inhibitory: bool, learning_rule: LearningRule,
+                 learning_rule_inh: LearningRule, bias: bool,
+                 a_plus: float = None, a_minus: float = None,
+                 b_plus: float = None, b_minus: float = None):
+
+        new_node_gene = HiddenNodeGeneDoublePlasticity(len(self.nodes))
+        new_node_gene.is_inhibitory = is_inhibitory
+        new_node_gene.learning_rule = learning_rule
+
+        if a_plus and a_minus and b_plus and b_minus:
+            if learning_rule.is_symmetric():
+                stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
+                                   'std_plus': b_plus, 'std_minus': b_minus}
+            else:
+                stdp_parameters = {'a_plus': a_plus, 'a_minus': a_minus,
+                                   'tau_plus': b_plus, 'tau_minus': b_minus}
+        else:
+            if learning_rule.is_symmetric():
+                stdp_parameters = NeuralNodeGene._initialize_symmetric_stdp_parameters()
+            else:
+                stdp_parameters = NeuralNodeGene._initialize_asymmetric_stdp_parameters()
+
+        new_node_gene.stdp_parameters = stdp_parameters
+        new_node_gene.bias = bias
+
+        new_node_gene.learning_rule_inh = learning_rule_inh
+        new_node_gene.stdp_parameters_inh = stdp_parameters
+
+        self.nodes[new_node_gene.key] = new_node_gene
+        return new_node_gene.key
 
 
 class Species(object):
@@ -441,7 +631,8 @@ class Population(object):
             old_members = sorted(species.members, key=lambda x: fitnesses[x.key], reverse=True)
 
             for genome in old_members[:max(int(species_size*ELITISM), MIN_SPECIES_SIZE)]:
-                genome.mutate()
+                if MUTATE_ELITE:
+                    genome.mutate()
                 new_population_of_genomes[genome.key] = genome
                 species_size -= 1
 
@@ -496,3 +687,117 @@ class Population(object):
 
     def _get_total_sum_of_adjusted_fitnesses(self, fitnesses: Dict[int, float]) -> float:
         return sum(self._get_fitness_sharing_adjusted_fitnesses(fitnesses).values())
+
+class PopulationDoublePlasticity(Population):
+    def __init__(self, population_size: int, input_size: int, output_size: int):
+        print("class PopulationDoublePlasticity(Population):")
+        self.genomes: Dict[int, GenomeDoublePlasticity] = {}
+        self.species: Dict[int, Species] = {}
+        self._genome_id_to_species_id: Dict[int, int] = {}
+        self._genome_id_counter = count(0)
+        self._species_id_counter = count(0)
+        self._innovation_number_counter = count(input_size * output_size + 1)
+        self._input_size = input_size
+        self._output_size = output_size
+        self._population_size = population_size
+
+        # Create initial population.
+        for _ in range(population_size):
+            genome_id = next(self._genome_id_counter)
+            self.genomes[genome_id] = GenomeDoublePlasticity(genome_id, self._input_size, self._output_size,
+                                             self._innovation_number_counter, is_initial_genome=True)
+        # Create initial species.
+        self.speciate()
+
+
+    def _create_new_offspring(self, parent_1: GenomeDoublePlasticity,
+                              parent_2: GenomeDoublePlasticity,
+                              fitness_1: float, fitness_2: float) -> Genome:
+        if fitness_2 > fitness_1:
+            parent_1, parent_2 = parent_2, parent_1
+        offspring = GenomeDoublePlasticity(next(self._genome_id_counter),
+                                           self._input_size, self._output_size,
+                                           self._innovation_number_counter)
+        parent_1.crossover(parent_2, offspring)
+        offspring.mutate()
+        return offspring
+
+    def next_generation(self, fitnesses: Dict[int, float]):
+        def sample_two_parents(members: List[GenomeDoublePlasticity]):
+            return random.sample(members, 2) if len(members) > 1 else (random.choice(members), random.choice(members))
+
+        # Remove species going extinct.
+        fitness_by_species = self._get_sum_of_adjusted_fitnesses_by_species(fitnesses)
+        for key, species in self.species.items():
+            species.age += 1
+            species.update_stagnation(fitness_by_species[key])
+        self._remove_extinct_species(fitness_by_species, fitnesses)
+
+        # Create new population of genomes
+        assigned_number_of_offspring_per_species = self._assign_number_of_offspring_to_species(fitnesses)
+        new_population_of_genomes = {}
+        for species_id, species in self.species.items():
+            species_size = assigned_number_of_offspring_per_species[species_id]
+            old_members = sorted(species.members, key=lambda x: fitnesses[x.key], reverse=True)
+
+            for genome in old_members[:max(int(species_size*ELITISM), MIN_SPECIES_SIZE)]:
+                if MUTATE_ELITE:
+                    genome.mutate()
+                new_population_of_genomes[genome.key] = genome
+                species_size -= 1
+
+            cutoff = max(int(np.ceil(MATING_CUTTOFF_PERCENTAGE * len(old_members))), 2)
+            old_members = old_members[:cutoff]
+
+            while species_size > 0:
+                species_size -= 1
+                parent_1, parent_2 = sample_two_parents(old_members)
+                offspring = self._create_new_offspring(parent_1, parent_2,
+                                                       fitnesses[parent_1.key],
+                                                       fitnesses[parent_2.key])
+                new_population_of_genomes[offspring.key] = offspring
+
+        self.genomes = new_population_of_genomes
+        self.speciate()
+
+class PopulationCustom(Population):
+    def __init__(self, population_size: int, input_size: int, output_size: int):
+        self.genomes: Dict[int, Genome] = {}
+        self.species: Dict[int, Species] = {}
+        self._genome_id_to_species_id: Dict[int, int] = {}
+        self._genome_id_counter = count(0)
+        self._species_id_counter = count(0)
+        self._innovation_number_counter = count(input_size * output_size + 1)
+        self._input_size = input_size
+        self._output_size = output_size
+        self._population_size = population_size
+
+        # Create initial population.
+        for _ in range(population_size):
+            genome_id = next(self._genome_id_counter)
+            self.genomes[genome_id] = Genome(genome_id, self._input_size, self._output_size,
+                                             self._innovation_number_counter, is_initial_genome=False)
+        # Create initial species.
+        self.speciate()
+
+
+
+class PopulationDoublePlasticityCustom(PopulationDoublePlasticity):
+    def __init__(self, population_size: int, input_size: int, output_size: int):
+        self.genomes: Dict[int, GenomeDoublePlasticity] = {}
+        self.species: Dict[int, Species] = {}
+        self._genome_id_to_species_id: Dict[int, int] = {}
+        self._genome_id_counter = count(0)
+        self._species_id_counter = count(0)
+        self._innovation_number_counter = count(input_size * output_size + 1)
+        self._input_size = input_size
+        self._output_size = output_size
+        self._population_size = population_size
+
+        # Create initial population.
+        for _ in range(population_size):
+            genome_id = next(self._genome_id_counter)
+            self.genomes[genome_id] = GenomeDoublePlasticity(genome_id, self._input_size, self._output_size,
+                                             self._innovation_number_counter, is_initial_genome=False)
+        # Create initial species.
+        #self.speciate()

@@ -116,8 +116,8 @@ for i, key in enumerate(sorted(weights.keys(), key=lambda x: x[1])):
 add_table()
 
 # Actuator history
-fig = plt.figure()
-fig.suptitle("Actuator history")
+fig = plt.figure(figsize=(17,5))
+# fig.suptitle("Actuator history")
 eat_actuators = [actuator[0] for actuator in actuators]
 avoid_actuators = [actuator[1] for actuator in actuators]
 plt.plot(t_values, eat_actuators, color=GREEN, alpha=alpha)

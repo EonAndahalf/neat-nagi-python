@@ -60,6 +60,16 @@ def get_learning_rule_function(learning_rule: LearningRule):
         LearningRule.symmetric_anti_hebbian: symmetric_anti_hebbian
     }[learning_rule]
 
+def get_double_learning_rule_function(learning_rule_exc: LearningRule,
+                                      learning_rule_inh: LearningRule):
+    learning_rule_dict = {
+        LearningRule.asymmetric_hebbian: asymmetric_hebbian,
+        LearningRule.asymmetric_anti_hebbian: asymmetric_anti_hebbian,
+        LearningRule.symmetric_hebbian: symmetric_hebbian,
+        LearningRule.symmetric_anti_hebbian: symmetric_anti_hebbian
+    }
+    return learning_rule_dict[learning_rule_exc], learning_rule_dict[learning_rule_inh]
+
 
 def get_learning_rule_params(learning_rule: LearningRule):
     return {

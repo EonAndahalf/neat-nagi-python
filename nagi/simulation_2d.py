@@ -7,8 +7,8 @@ import numpy as np
 
 from nagi.constants import TIME_STEP_IN_MSEC, MAX_HEALTH_POINTS_2D, FLIP_POINT_2D, \
     ACTUATOR_WINDOW, LIF_SPIKE_VOLTAGE, NUM_TIME_STEPS, DAMAGE_FROM_CORRECT_ACTION, \
-    DAMAGE_FROM_INCORRECT_ACTION, INPUT_SAMPLES_PER_SIMULATION, DAMAGE_PENALTY_FOR_HIDDEN_NEURONS, PRINT_GREEN, \
-    PRINT_RED
+    DAMAGE_FROM_INCORRECT_ACTION, INPUT_SAMPLES_PER_SIMULATION_2D, DAMAGE_PENALTY_FOR_HIDDEN_NEURONS, PRINT_GREEN, \
+    PRINT_RED, REPEAT_SIM
 from nagi.lifsnn import LIFSpikingNeuralNetwork
 from nagi.neat import Genome
 
@@ -86,45 +86,60 @@ class TwoDimensionalEnvironment(object):
                                 incorrect_partition * DAMAGE_FROM_INCORRECT_ACTION) ** DAMAGE_PENALTY_FOR_HIDDEN_NEURONS
 
     def simulate(self, agent: TwoDimensionalAgent) -> Tuple[int, float, float, float]:
-        zero_actuator = []
-        one_actuator = []
-        correct_predictions = 0
-        correct_end_of_sample_predictions = 0
-        inputs = self._get_initial_input_voltages()
-        for i, sample in enumerate(self.input_loadout):
-            zero_actuator = [t for t in zero_actuator if t >= NUM_TIME_STEPS * (i - 1)]
-            one_actuator = [t for t in one_actuator if t >= NUM_TIME_STEPS * (i - 1)]
-            frequencies = self._get_initial_input_frequencies(sample)
-            if i >= FLIP_POINT_2D and i % FLIP_POINT_2D == 0:
-                self.mutate()
-            for time_step in range(i * NUM_TIME_STEPS, (i + 1) * NUM_TIME_STEPS):
-                correct_predictions += self._get_correct_wrong_int(agent, sample)
-                if agent.health_points <= 0:
-                    return (agent.key,
-                            self._fitness(time_step),
-                            correct_predictions / time_step,
-                            correct_end_of_sample_predictions / i)
-                if time_step > 0:
-                    frequencies = self._get_input_frequencies(time_step, sample, zero_actuator, one_actuator,
-                                                              frequencies[4:])
-                    inputs = self._get_input_voltages(time_step, frequencies)
+        fitness_list = []
+        correct_predictions_list = []
+        correct_end_of_sample_predictions_list = []
+        for sim_idx in range(REPEAT_SIM):
+            agent.reset()
+            zero_actuator = []
+            one_actuator = []
+            correct_predictions = 0
+            correct_end_of_sample_predictions = 0
+            inputs = self._get_initial_input_voltages()
+            stop_sim = False
+            for i, sample in enumerate(self.input_loadout):
+                zero_actuator = [t for t in zero_actuator if t >= NUM_TIME_STEPS * (i - 1)]
+                one_actuator = [t for t in one_actuator if t >= NUM_TIME_STEPS * (i - 1)]
+                frequencies = self._get_initial_input_frequencies(sample)
+                if i >= FLIP_POINT_2D and i % FLIP_POINT_2D == 0:
+                    self.mutate()
+                for time_step in range(i * NUM_TIME_STEPS, (i + 1) * NUM_TIME_STEPS):
+                    correct_predictions += self._get_correct_wrong_int(agent, sample)
+                    if agent.health_points <= 0:
+                        if agent.health_points <= 0:
+                            fitness_list.append(self._fitness(time_step))
+                            correct_predictions_list.append(correct_predictions / time_step)
+                            correct_end_of_sample_predictions_list.append(correct_end_of_sample_predictions / i)
+                            stop_sim = True
+                            break
+                    if time_step > 0:
+                        frequencies = self._get_input_frequencies(time_step, sample, zero_actuator, one_actuator,
+                                                                  frequencies[4:])
+                        inputs = self._get_input_voltages(time_step, frequencies)
 
-                agent.spiking_neural_network.set_inputs(inputs)
-                zero, one = agent.spiking_neural_network.advance(TIME_STEP_IN_MSEC)
-                if zero:
-                    zero_actuator.append(time_step)
-                if one:
-                    one_actuator.append(time_step)
-                agent.zero_actuator = TwoDimensionalEnvironment._count_spikes_within_time_window(time_step,
-                                                                                                 zero_actuator)
-                agent.one_actuator = TwoDimensionalEnvironment._count_spikes_within_time_window(time_step, one_actuator)
-                self.deal_damage(agent, sample)
-            correct_end_of_sample_predictions += self._get_correct_wrong_int(agent, sample)
+                    agent.spiking_neural_network.set_inputs(inputs)
+                    zero, one = agent.spiking_neural_network.advance(TIME_STEP_IN_MSEC)
+                    if zero:
+                        zero_actuator.append(time_step)
+                    if one:
+                        one_actuator.append(time_step)
+                    agent.zero_actuator = TwoDimensionalEnvironment._count_spikes_within_time_window(time_step,
+                                                                                                     zero_actuator)
+                    agent.one_actuator = TwoDimensionalEnvironment._count_spikes_within_time_window(time_step, one_actuator)
+                    self.deal_damage(agent, sample)
+                if stop_sim:
+                    break
+                correct_end_of_sample_predictions += self._get_correct_wrong_int(agent, sample)
+
+            if not stop_sim:
+                fitness_list.append(self._fitness(self.maximum_possible_lifetime))
+                correct_predictions_list.append(correct_predictions / (NUM_TIME_STEPS * INPUT_SAMPLES_PER_SIMULATION_2D))
+                correct_end_of_sample_predictions_list.append(correct_end_of_sample_predictions / INPUT_SAMPLES_PER_SIMULATION_2D)
 
         return (agent.key,
-                self._fitness(self.maximum_possible_lifetime),
-                correct_predictions / (NUM_TIME_STEPS * INPUT_SAMPLES_PER_SIMULATION),
-                correct_end_of_sample_predictions / INPUT_SAMPLES_PER_SIMULATION)
+                np.mean(fitness_list),
+                np.mean(correct_predictions_list),
+                np.mean(correct_end_of_sample_predictions_list))
 
     def simulate_with_visualization(self, agent: TwoDimensionalAgent) -> \
             Tuple[int, float, dict, dict, int, List[Tuple[int, int]], List[Tuple[int, int]], float, float,
@@ -159,6 +174,7 @@ class TwoDimensionalEnvironment(object):
                 for key, membrane_potential in agent.spiking_neural_network.get_membrane_potentials_and_thresholds().items():
                     membrane_potentials[key].append(membrane_potential)
                 if agent.health_points <= 0:
+                    print("END time_step", time_step)
                     return (agent.key,
                             self._fitness(time_step),
                             weights,
@@ -186,9 +202,10 @@ class TwoDimensionalEnvironment(object):
                 self.deal_damage(agent, sample)
             end_of_sample_prediction_logger.append(self._get_correct_wrong_int(agent, sample))
             str_correct_wrong = self._get_correct_wrong_string(agent, sample)
+            fitness_print = self._fitness(time_step)
             print(
                 f'Agent health: {int(agent.health_points)}, i={i}, current_logic_gate: {self.current_logic_gate}, sample: {sample}, prediction: {agent.select_prediction()} {str_correct_wrong}')
-            print(f'Zero: {agent.zero_actuator}, One: {agent.one_actuator}')
+            print(f'Zero: {agent.zero_actuator}, One: {agent.one_actuator}, One: {fitness_print}')
         return (agent.key,
                 self._fitness(self.maximum_possible_lifetime),
                 weights,
@@ -203,7 +220,7 @@ class TwoDimensionalEnvironment(object):
 
     @staticmethod
     def _initialize_input_loadout():
-        return [*random.sample([(0, 0), (0, 1), (1, 0), (1, 1)], 4) * int(INPUT_SAMPLES_PER_SIMULATION / 4)]
+        return [*random.sample([(0, 0), (0, 1), (1, 0), (1, 1)], 4) * int(INPUT_SAMPLES_PER_SIMULATION_2D / 4)]
 
     @staticmethod
     def _initialize_logic_gate_and_mutator(testing: bool):

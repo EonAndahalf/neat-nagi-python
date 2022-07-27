@@ -1,5 +1,6 @@
 import pickle
 
+import numpy as np
 import matplotlib.pyplot as plt
 from easygui import fileopenbox
 from matplotlib.lines import Line2D
@@ -14,7 +15,7 @@ with open(f'{fileopenbox(default=f"{ROOT_PATH}/data/*genome*.pkl")}', 'rb') as f
     test_genome = pickle.load(file)
 
 agent = TwoDimensionalAgent.create_agent(test_genome)
-visualize_genome(test_genome, show_learning_rules=False, with_legend=False)
+visualize_genome(test_genome, show_learning_rules=True, with_legend=True)
 environment = TwoDimensionalEnvironment(50, 5, testing=True)
 (_,
  fitness,
@@ -30,7 +31,7 @@ environment = TwoDimensionalEnvironment(50, 5, testing=True)
 
 number_of_neurons = len(membrane_potentials.keys())
 number_of_weights = len(weights.keys())
-t_values = range(time_step + 1)
+t_values = np.arange(time_step + 1)
 alpha = 0.85
 
 
@@ -73,8 +74,8 @@ def add_table():
 
 
 # Membrane potential
-fig = plt.figure()
-fig.suptitle("Neuron membrane potentials")
+fig = plt.figure(figsize=(17,5))
+# fig.suptitle("Neuron membrane potentials")
 for i, key in enumerate(sorted(membrane_potentials.keys())):
     plt.subplot(number_of_neurons, 1, i + 1)
     h = plt.ylabel(f"({key})    ")
@@ -95,8 +96,8 @@ for i, key in enumerate(sorted(membrane_potentials.keys())):
 add_table()
 
 # Weights
-fig = plt.figure()
-plt.suptitle("Weights")
+fig = plt.figure(figsize=(17,5))
+# plt.suptitle("Weights")
 for i, key in enumerate(sorted(weights.keys(), key=lambda x: x[1])):
     plt.subplot(number_of_weights, 1, i + 1)
     h = plt.ylabel(f"{key}       ")
@@ -117,17 +118,24 @@ for i, key in enumerate(sorted(weights.keys(), key=lambda x: x[1])):
 add_table()
 
 # Actuator history
-fig = plt.figure()
-fig.suptitle("Actuator history")
-eat_actuators = [actuator[0] for actuator in actuators]
-avoid_actuators = [actuator[1] for actuator in actuators]
-plt.plot(t_values, eat_actuators, color=GREEN, alpha=alpha)
-plt.plot(t_values, avoid_actuators, color=BLUE, alpha=alpha)
+fig = plt.figure(figsize=(17,5))
+# fig.suptitle("Actuator history")
+zero_actuator = np.array([actuator[0] for actuator in actuators])
+one_actuator = np.array([actuator[1] for actuator in actuators])
+plt.plot(t_values, zero_actuator, linewidth=0.2, color=GREEN, alpha=1)
+plt.plot(t_values, one_actuator, linewidth=0.2, color=BLUE, alpha=1)
+
+# zero_action = zero_actuator > one_actuator
+# one_action = zero_actuator < one_actuator
+# plt.scatter(t_values[zero_action], zero_actuator[zero_action], s=10, marker='o', color=GREEN, alpha=1)
+# plt.scatter(t_values[one_action], one_actuator[one_action], s=10, marker='x', color=BLUE, alpha=1)
+
+
 plt.xlabel("Time step")
 plt.gca().xaxis.set_ticks_position('top')
 plt.gca().xaxis.set_label_position('top')
-add_fig_legend((GREEN, 'eat actuator'), (BLUE, 'avoid actuator'))
-add_vertical_lines_and_background(max(max(eat_actuators), max(avoid_actuators)) + 2)
+add_fig_legend((GREEN, '0 actuator'), (BLUE, '1 actuator'))
+add_vertical_lines_and_background(max(max(zero_actuator), max(one_actuator)) + 2)
 add_table()
 plt.xlim(0, len(t_values) + NUM_TIME_STEPS - len(t_values) % NUM_TIME_STEPS)
 

@@ -7,7 +7,8 @@ import numpy as np
 
 from nagi.constants import TIME_STEP_IN_MSEC, MAX_HEALTH_POINTS_1D, FLIP_POINT_1D, \
     ACTUATOR_WINDOW, LIF_SPIKE_VOLTAGE, NUM_TIME_STEPS, DAMAGE_FROM_CORRECT_ACTION, \
-    DAMAGE_FROM_INCORRECT_ACTION, FOOD_SAMPLES_PER_SIMULATION, DAMAGE_PENALTY_FOR_HIDDEN_NEURONS, PRINT_GREEN, PRINT_RED
+    DAMAGE_FROM_INCORRECT_ACTION, FOOD_SAMPLES_PER_SIMULATION, \
+    DAMAGE_PENALTY_FOR_HIDDEN_NEURONS, PRINT_GREEN, PRINT_RED, REPEAT_SIM
 from nagi.lifsnn import LIFSpikingNeuralNetwork
 from nagi.neat import Genome
 
@@ -72,45 +73,58 @@ class OneDimensionalEnvironment(object):
                                 incorrect_partition * DAMAGE_FROM_INCORRECT_ACTION) ** DAMAGE_PENALTY_FOR_HIDDEN_NEURONS
 
     def simulate(self, agent: OneDimensionalAgent) -> Tuple[int, float, float, float]:
-        eat_actuator = []
-        avoid_actuator = []
-        correct_actions = 0
-        correct_end_of_sample_actions = 0
-        inputs = self._get_initial_input_voltages()
-        for i, sample in enumerate(self.food_loadout):
-            eat_actuator = [t for t in eat_actuator if t >= NUM_TIME_STEPS * (i - 1)]
-            avoid_actuator = [t for t in avoid_actuator if t >= NUM_TIME_STEPS * (i - 1)]
-            frequencies = self._get_initial_input_frequencies(sample)
-            if i >= FLIP_POINT_1D and i % FLIP_POINT_1D == 0:
-                self.mutate()
-            for time_step in range(i * NUM_TIME_STEPS, (i + 1) * NUM_TIME_STEPS):
-                correct_actions += self._get_correct_wrong_int(agent, sample)
-                if agent.health_points <= 0:
-                    return (agent.key,
-                            self._fitness(time_step),
-                            correct_actions / time_step,
-                            correct_end_of_sample_actions / i)
-                if time_step > 0:
-                    frequencies = self._get_input_frequencies(time_step, sample, eat_actuator, avoid_actuator,
-                                                              frequencies[2:])
-                    inputs = self._get_input_voltages(time_step, frequencies)
+        fitness_list = []
+        correct_predictions_list = []
+        correct_end_of_sample_predictions_list = []
+        for sim_idx in range(REPEAT_SIM):
+            agent.reset()
+            eat_actuator = []
+            avoid_actuator = []
+            correct_actions = 0
+            correct_end_of_sample_actions = 0
+            inputs = self._get_initial_input_voltages()
+            stop_sim = False
+            for i, sample in enumerate(self.food_loadout):
+                eat_actuator = [t for t in eat_actuator if t >= NUM_TIME_STEPS * (i - 1)]
+                avoid_actuator = [t for t in avoid_actuator if t >= NUM_TIME_STEPS * (i - 1)]
+                frequencies = self._get_initial_input_frequencies(sample)
+                if i >= FLIP_POINT_1D and i % FLIP_POINT_1D == 0:
+                    self.mutate()
+                for time_step in range(i * NUM_TIME_STEPS, (i + 1) * NUM_TIME_STEPS):
+                    correct_actions += self._get_correct_wrong_int(agent, sample)
+                    if agent.health_points <= 0:
+                        fitness_list.append(self._fitness(time_step))
+                        correct_predictions_list.append(correct_actions / time_step)
+                        correct_end_of_sample_predictions_list.append(correct_end_of_sample_actions / i)
+                        stop_sim = True
+                        break
+                    if time_step > 0:
+                        frequencies = self._get_input_frequencies(time_step, sample, eat_actuator, avoid_actuator,
+                                                                  frequencies[2:])
+                        inputs = self._get_input_voltages(time_step, frequencies)
 
-                agent.spiking_neural_network.set_inputs(inputs)
-                eat, avoid = agent.spiking_neural_network.advance(TIME_STEP_IN_MSEC)
-                if eat:
-                    eat_actuator.append(time_step)
-                if avoid:
-                    avoid_actuator.append(time_step)
-                agent.eat_actuator = OneDimensionalEnvironment._count_spikes_within_time_window(time_step, eat_actuator)
-                agent.avoid_actuator = OneDimensionalEnvironment._count_spikes_within_time_window(time_step,
-                                                                                                  avoid_actuator)
-                self.deal_damage(agent, sample)
-            correct_end_of_sample_actions += self._get_correct_wrong_int(agent, sample)
+                    agent.spiking_neural_network.set_inputs(inputs)
+                    eat, avoid = agent.spiking_neural_network.advance(TIME_STEP_IN_MSEC)
+                    if eat:
+                        eat_actuator.append(time_step)
+                    if avoid:
+                        avoid_actuator.append(time_step)
+                    agent.eat_actuator = OneDimensionalEnvironment._count_spikes_within_time_window(time_step, eat_actuator)
+                    agent.avoid_actuator = OneDimensionalEnvironment._count_spikes_within_time_window(time_step,
+                                                                                                      avoid_actuator)
+                    self.deal_damage(agent, sample)
+                if stop_sim:
+                    break
+                correct_end_of_sample_actions += self._get_correct_wrong_int(agent, sample)
+            if not stop_sim:
+                fitness_list.append(self._fitness(self.maximum_possible_lifetime))
+                correct_predictions_list.append(correct_actions / (NUM_TIME_STEPS * FOOD_SAMPLES_PER_SIMULATION))
+                correct_end_of_sample_predictions_list.append(correct_end_of_sample_actions / FOOD_SAMPLES_PER_SIMULATION)
 
         return (agent.key,
-                self._fitness(self.maximum_possible_lifetime),
-                correct_actions / (NUM_TIME_STEPS * FOOD_SAMPLES_PER_SIMULATION),
-                correct_end_of_sample_actions / FOOD_SAMPLES_PER_SIMULATION)
+                np.mean(fitness_list),
+                np.mean(correct_predictions_list),
+                np.mean(correct_end_of_sample_predictions_list))
 
     def simulate_with_visualization(self, agent: OneDimensionalAgent) \
             -> Tuple[
@@ -194,6 +208,7 @@ class OneDimensionalEnvironment(object):
     @staticmethod
     def _initialize_food_loadout():
         return [*random.sample([color for color in Food], 2) * int(FOOD_SAMPLES_PER_SIMULATION / Food.__len__())]
+        # return [Food.WHITE, Food.BLACK] * int(FOOD_SAMPLES_PER_SIMULATION / Food.__len__())
 
     @staticmethod
     def _initialize_beneficial_food_and_mutator() -> Tuple[BeneficialFood, Dict[BeneficialFood, BeneficialFood]]:
