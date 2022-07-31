@@ -6,7 +6,7 @@ from typing import List, Tuple
 import numpy as np
 import random
 
-from nagi.constants import TIME_STEP_IN_MSEC, \
+from nagi.constants_v2 import TIME_STEP_IN_MSEC, \
     ACTUATOR_WINDOW, LIF_SPIKE_VOLTAGE, MAX_POINTS_CARTPOLE_SIM, REPEAT_SIM
 from nagi.lifsnn import LIFSpikingNeuralNetwork
 from nagi.neat import Genome

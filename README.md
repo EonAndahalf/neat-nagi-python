@@ -8,6 +8,22 @@ git clone https://github.com/SocratesNFR/neat-nagi-python.git
 export PYTHONPATH="/path/to/neat-nagi-python":$PYTHONPATH
 ```
 
+## Evolving and simulating an adaptive spiking neural network
+
+You start in the 'scripts' folder. Run NEAT algorithm. After finished, you extract the genome from the generate pickle file inside 'data' folder. The extracted genome can be simulated with 'simulation_*.py'.
+
+```
+cd scripts
+python run_neat_*.py
+python extract_genome.py
+python simulation_*.py
+```
+
+### Evolved adaptive spiking neural networks
+
+If you want to simulate already evolved spiking neural networks. They are located in 'evolved_nets' folder.
+
+
 ## Preprint with conceptual framework
 [Sidney Pontes-Filho and Stefano Nichele. "A Conceptual Bio-Inspired Framework for the Evolution of Artificial General Intelligence." arXiv preprint arXiv:1903.10410 (2019).](https://arxiv.org/abs/1903.10410)
 
