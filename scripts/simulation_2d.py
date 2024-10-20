@@ -1,12 +1,13 @@
-import pickle
-
+import pickle, sys, os
 import numpy as np
 import matplotlib.pyplot as plt
 from easygui import fileopenbox
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from definitions import ROOT_PATH
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # Fucking windows 98 cant find its own paths
+ROOT_PATH = os.path.dirname(os.path.dirname(__file__))
+
 from nagi.constants import FLIP_POINT_2D, NUM_TIME_STEPS, RED, BLUE, GREEN
 from nagi.simulation_2d import TwoDimensionalEnvironment, TwoDimensionalAgent
 from nagi.visualization import visualize_genome
@@ -17,6 +18,8 @@ with open(f'{fileopenbox(default=f"{ROOT_PATH}/data/*genome*.pkl")}', 'rb') as f
 agent = TwoDimensionalAgent.create_agent(test_genome)
 visualize_genome(test_genome, show_learning_rules=True, with_legend=True)
 environment = TwoDimensionalEnvironment(50, 5, testing=True)
+
+
 (_,
  fitness,
  weights,

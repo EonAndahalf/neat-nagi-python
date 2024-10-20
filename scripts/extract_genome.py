@@ -1,12 +1,10 @@
-import math
-import pickle
-import sys
+import math, pickle, sys, os
 from typing import Dict
 from pathlib import Path
-
 from easygui import fileopenbox
 
-from definitions import ROOT_PATH
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # Fucking windows 98 cant find its own paths
+ROOT_PATH = os.path.dirname(os.path.dirname(__file__))
 
 
 def get_nth_top_genome(n: int, measure: str, results: Dict[int, Dict]):

@@ -5,7 +5,7 @@ from typing import List, Tuple
 
 import numpy as np
 
-from nagi.constants_v1 import TIME_STEP_IN_MSEC, MAX_HEALTH_POINTS_2D, FLIP_POINT_2D, \
+from nagi.constants import TIME_STEP_IN_MSEC, MAX_HEALTH_POINTS_2D, FLIP_POINT_2D, \
     ACTUATOR_WINDOW, LIF_SPIKE_VOLTAGE, NUM_TIME_STEPS, DAMAGE_FROM_CORRECT_ACTION, \
     DAMAGE_FROM_INCORRECT_ACTION, INPUT_SAMPLES_PER_SIMULATION_2D, DAMAGE_PENALTY_FOR_HIDDEN_NEURONS, PRINT_GREEN, \
     PRINT_RED, REPEAT_SIM
@@ -63,6 +63,9 @@ class TwoDimensionalAgent(object):
         self.zero_actuator = 0
         self.one_actuator = 0
 
+    def reset(self):
+        self.spiking_neural_network.reset(reset_weights=True)
+
     @staticmethod
     def create_agent(genome: Genome):
         return TwoDimensionalAgent(genome.key, LIFSpikingNeuralNetwork.create(genome))
@@ -105,6 +108,7 @@ class TwoDimensionalEnvironment(object):
                     self.mutate()
                 for time_step in range(i * NUM_TIME_STEPS, (i + 1) * NUM_TIME_STEPS):
                     correct_predictions += self._get_correct_wrong_int(agent, sample)
+
                     if agent.health_points <= 0:
                         if agent.health_points <= 0:
                             fitness_list.append(self._fitness(time_step))
@@ -112,6 +116,7 @@ class TwoDimensionalEnvironment(object):
                             correct_end_of_sample_predictions_list.append(correct_end_of_sample_predictions / i)
                             stop_sim = True
                             break
+                        
                     if time_step > 0:
                         frequencies = self._get_input_frequencies(time_step, sample, zero_actuator, one_actuator,
                                                                   frequencies[4:])
@@ -141,6 +146,10 @@ class TwoDimensionalEnvironment(object):
                 np.mean(correct_predictions_list),
                 np.mean(correct_end_of_sample_predictions_list))
 
+
+
+
+
     def simulate_with_visualization(self, agent: TwoDimensionalAgent) -> \
             Tuple[int, float, dict, dict, int, List[Tuple[int, int]], List[Tuple[int, int]], float, float,
                   List[Tuple[int, int]], List[LogicGate]]:
@@ -166,6 +175,7 @@ class TwoDimensionalEnvironment(object):
                 self.mutate()
             sample_logger.append(sample)
             logic_gate_logger.append(self.current_logic_gate)
+
             for time_step in range(i * NUM_TIME_STEPS, (i + 1) * NUM_TIME_STEPS):
                 actuator_logger.append((agent.zero_actuator, agent.one_actuator))
                 prediction_logger.append(self._get_correct_wrong_int(agent, sample))
@@ -187,6 +197,7 @@ class TwoDimensionalEnvironment(object):
                             sample_logger,
                             logic_gate_logger)
                 if time_step > 0:
+
                     frequencies = self._get_input_frequencies(time_step, sample, zero_actuator, one_actuator,
                                                               frequencies[4:])
                     inputs = self._get_input_voltages(time_step, frequencies)
@@ -205,7 +216,8 @@ class TwoDimensionalEnvironment(object):
             fitness_print = self._fitness(time_step)
             print(
                 f'Agent health: {int(agent.health_points)}, i={i}, current_logic_gate: {self.current_logic_gate}, sample: {sample}, prediction: {agent.select_prediction()} {str_correct_wrong}')
-            print(f'Zero: {agent.zero_actuator}, One: {agent.one_actuator}, One: {fitness_print}')
+            print(f'Actuator Zero: {agent.zero_actuator}, Actuator One: {agent.one_actuator}, Fitness: {fitness_print}')
+            
         return (agent.key,
                 self._fitness(self.maximum_possible_lifetime),
                 weights,

@@ -1,11 +1,10 @@
 import multiprocessing as mp
-import pickle
-import time
+import time, pickle, os, sys, tqdm
 from copy import deepcopy
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # Fucking windows 98 cant find its own paths
+ROOT_PATH = os.path.dirname(os.path.dirname(__file__))
 
-import tqdm
 
-from definitions import ROOT_PATH
 from nagi.neat import Population
 from nagi.simulation_2d import TwoDimensionalAgent, TwoDimensionalEnvironment
 
@@ -36,7 +35,7 @@ high_frequency = 50
 low_frequency = 5
 
 population_size = 100
-number_of_generations = 1000
+number_of_generations = 500
 
 if __name__ == '__main__':
     pickle_path, txt_path = get_file_paths()
@@ -56,10 +55,11 @@ if __name__ == '__main__':
         agents = list([TwoDimensionalAgent.create_agent(genome) for genome in population.genomes.values()])
 
         results = tqdm.tqdm(pool.imap_unordered(env.simulate, agents), total=(len(agents)))
-
         data_dict = {result[0]: result[1:] for result in results}
+        
         fitnesses = {key: value[0] for key, value in data_dict.items()}
         accuracies = {key: value[1] for key, value in data_dict.items()}
+
         end_of_sample_accuracies = {key: value[2] for key, value in data_dict.items()}
 
         most_fit_genome_key, highest_fitness = max(fitnesses.items(), key=lambda x: x[1])

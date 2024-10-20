@@ -648,6 +648,8 @@ class Population(object):
                 new_population_of_genomes[offspring.key] = offspring
 
         self.genomes = new_population_of_genomes
+        print("new len og Genomes: ", {len(self.genomes)})
+
         self.speciate()
 
     def _assign_number_of_offspring_to_species(self, fitnesses: Dict[int, float]) -> Dict[int, int]:

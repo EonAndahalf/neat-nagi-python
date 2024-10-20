@@ -4,6 +4,8 @@ Copied from http://incompleteideas.net/sutton/book/code/pole.c
 permalink: https://perma.cc/C9ZM-652R
 """
 
+
+
 import math
 import gym
 from gym import spaces, logger
@@ -80,7 +82,7 @@ class NagiCartPoleEnv(gym.Env):
                         dtype=np.float32)
 
         self.action_space = spaces.Discrete(2)
-        self.observation_space = spaces.Box(-high, high, dtype=np.float32)
+        self.observation_space = spaces.Box(-high, high)
 
         self.seed()
         self.viewer = None

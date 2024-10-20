@@ -43,9 +43,9 @@ class CartpoleConfigs(Enum):
 #        return [CartpoleConfigs.DEFAULT_M, CartpoleConfigs.INVERTED_M,
 #                CartpoleConfigs.DEFAULT_XS, CartpoleConfigs.INVERTED_XS,
 #                CartpoleConfigs.DEFAULT_XL, CartpoleConfigs.INVERTED_XL]
-#        return [CartpoleConfigs.DEFAULT_M, CartpoleConfigs.DEFAULT_XS,
-#                CartpoleConfigs.DEFAULT_XL, CartpoleConfigs.INVERTED_M,
-#                CartpoleConfigs.INVERTED_XS, CartpoleConfigs.INVERTED_XL]
+        return [CartpoleConfigs.DEFAULT_M]
+                #CartpoleConfigs.DEFAULT_XL, CartpoleConfigs.INVERTED_M,
+                #CartpoleConfigs.INVERTED_XS, CartpoleConfigs.INVERTED_XL]
         return [CartpoleConfigs.DEFAULT_M,
                 CartpoleConfigs.DEFAULT_XS,
                 CartpoleConfigs.DEFAULT_XL]
@@ -57,7 +57,7 @@ class CartpoleConfigs(Enum):
 #                CartpoleConfigs.DEFAULT_L, CartpoleConfigs.INVERTED_L]
 #        return [CartpoleConfigs.DEFAULT_S, CartpoleConfigs.DEFAULT_L,
 #                CartpoleConfigs.INVERTED_S, CartpoleConfigs.INVERTED_L]
-        return [CartpoleConfigs.DEFAULT_S,
+        return [#CartpoleConfigs.DEFAULT_S,
                 CartpoleConfigs.DEFAULT_L]
 
 class CartpoleAgent(object):

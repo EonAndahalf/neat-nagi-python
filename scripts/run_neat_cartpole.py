@@ -1,11 +1,16 @@
+
+import sys, os, time, pickle
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # Fucking windows 98 cant find its own paths
+ROOT_PATH = os.path.dirname(os.path.dirname(__file__))
 import multiprocessing as mp
-import pickle
-import time
+
+
 from copy import deepcopy
 
 #import tqdm
 
-from definitions import ROOT_PATH
+
+
 from nagi.neat import Population
 from nagi.simulation_cartpole import CartpoleAgent, CartpoleEnvironment
 
@@ -35,8 +40,8 @@ input_size, output_size = 12, 2
 high_frequency = 50
 low_frequency = 5
 
-population_size = 8
-number_of_generations = 2
+population_size = 1
+number_of_generations = 10
 
 if __name__ == '__main__':
     pickle_path, txt_path = get_file_paths()
@@ -59,6 +64,7 @@ if __name__ == '__main__':
         results = pool.imap_unordered(env.simulate, agents, 1)
 
         data_dict = {result[0]: result[1:] for result in results}
+        
         fitnesses = {key: value[0] for key, value in data_dict.items()}
 
         most_fit_genome_key, highest_fitness = max(fitnesses.items(), key=lambda x: x[1])

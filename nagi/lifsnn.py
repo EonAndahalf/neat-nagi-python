@@ -227,8 +227,11 @@ class LIFSpikingNeuralNetwork(object):
                 in_neuron = self.neurons.get(key)
                 if in_neuron is not None:
                     in_value = in_neuron.fired
+                    
                 else:
                     in_value = self.input_values[key]
+                    if in_value>0:
+                        print(f"Input value : {in_value}")
 
                 # Trigger STDP on received input spike.
                 if in_value:
@@ -279,7 +282,7 @@ class LIFSpikingNeuralNetwork(object):
                                              learning_nodes[key].is_inhibitory,
                                              learning_nodes[key].stdp_parameters,
                                              learning_nodes[key].bias)
-                       for key, inputs in node_inputs.items()}
+                                             for key, inputs in node_inputs.items()}
 
         except AttributeError:
             neurons = {key: LIFSpikingNeuron(inputs,
@@ -287,7 +290,7 @@ class LIFSpikingNeuralNetwork(object):
                                              learning_nodes[key].is_inhibitory,
                                              learning_nodes[key].stdp_parameters,
                                              False)
-                       for key, inputs in node_inputs.items()}
+                                             for key, inputs in node_inputs.items()}
 
         return LIFSpikingNeuralNetwork(neurons, input_keys, output_keys)
 
@@ -309,8 +312,10 @@ class LIFSpikingNeuralNetworkDoublePlasticity(LIFSpikingNeuralNetwork):
     @staticmethod
     def create(genome: GenomeDoublePlasticity):
         learning_nodes = {key: node for key, node in genome.nodes.items() if isinstance(node, NeuralNodeGeneDoublePlasticity)}
-        node_inputs = {key: [] for key in learning_nodes.keys()}
+
+        node_inputs     = {key: [] for key in learning_nodes.keys()}
         node_inputs_inh = {key: [] for key in learning_nodes.keys()}
+
         input_keys = [node.key for node in genome.nodes.values() if isinstance(node, InputNodeGene)]
         output_keys = [node.key for node in genome.nodes.values() if isinstance(node, OutputNodeGeneDoublePlasticity)]
         #print(genome.get_enabled_connections())
